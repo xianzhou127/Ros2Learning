@@ -20,7 +20,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            "Ultrasonic_noede = ssr_pkg.Ultrasonic_node:main"
+            "Ultrasonic_node = ssr_pkg.Ultrasonic_node:main"
         ],
     },
 )
