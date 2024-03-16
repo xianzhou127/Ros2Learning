@@ -1,6 +1,8 @@
 # Ros2-foxy
 <span id="1"></span>
 [Ros2官网文档](https://docs.ros.org/en/humble/Tutorials/Colcon-Tutorial.html)
+[rclpy官方文档](https://docs.ros2.org/latest/api/rclpy/index.html)
+[我的GitHub项目](https://github.com/xianzhou127/Ros2Learning?tab=readme-ov-file#1)
 
 - [Ros2-foxy](#ros2-foxy)
   - [1.创建工作空间](#1创建工作空间)
@@ -17,6 +19,8 @@
     - [RQT工具rqu\_graph](#rqt工具rqu_graph)
     - [话题相关命令](#话题相关命令)
     - [服务相关命令](#服务相关命令)
+    - [参数相关命令](#参数相关命令)
+    - [动作相关命令](#动作相关命令)
     - [接口命令](#接口命令)
 - [代码编写](#代码编写)
   - [1.节点创建](#1节点创建)
@@ -26,6 +30,9 @@
     - [自定义接口](#自定义接口)
     - [server服务端](#server服务端)
     - [server客户端](#server客户端)
+    - [param参数](#param参数)
+    - [action服务端](#action服务端)
+  - [3. launch文件编写](#3-launch文件编写)
 
 
 ## 1.创建工作空间
@@ -139,6 +146,32 @@ e.g.
 4. 查找使用某一接口的服务
 `ros2 service find example_interfaces/srv/AddTwoInts`
 
+### 参数相关命令
+1. 查看所有节点的参数列表
+`ros2 param list`
+2. 详细查看某节点某参数
+`ros2 param describe /turtlesim background_b`
+3. 查看参数值
+`ros2 param describe /turtlesim background_b`
+4. 动态设置参数值
+`ros2 param set /turtlesim background_r 44`
+5. 参数保存,保存为.yaml
+`ros2 param dump /turtlesim`
+6. 参数读取
+`ros2 param load  /turtlesim ./turtlesim.yaml`
+7. 启动节点同时参数读取
+`ros2 run turtlesim turtlesim_node --ros-args --params-file ./turtlesim.yaml `
+
+### 动作相关命令
+1. 获取目前系统中的action列表。
+`ros2 action list`
+2. 同时查看节点类型
+`ros2 action list -t`
+3. 查看action信息
+`ros2 action info /turtle1/rotate_absolute `
+4. 发送action请求到服务端
+`ros2 action send_goal /turtle1/rotate_absolute turtlesim/action/RotateAbsolute "{theta: 1.5}" --feedback`
+
 ### 接口命令
 通讯接口就是各种信息包，查看包可以直接上ros index
 1. 查看接口列表
@@ -173,19 +206,22 @@ from rclpy.node import Node
 def main(args=None):
     #入口函数
     rclpy.init(args=args)   #初始化节点
-    Ultrasonic_node = Node("Ultrasonic_node")  #新建节点
+    Ultrasonic_node = Node("Ultrasonic")  #新建节点
     Ultrasonic_node.get_logger().info("hello world")  
     rclpy.spin(Ultrasonic_node)    #保持节点运行
     rclpy.shudown()     #关闭rclpy
 ```
+新建节点还能这么写
+`Ulterasonic_node = rclpy.create_node("Ultrasonic"))`
 4. 修改/ssr_pkg/setup.py
 ```
 'console_scripts': [
-            "Ultrasonic_node = ssr_pkg.Ultrasonic_node:main"
+            "Ultrasonic = ssr_pkg.Ultrasonic_node:main"
         ],
 ```
+- Ultrasonic 节点名称，ros2 run的时候用的就是这个
 - ssr_pkg 包名
-- Ultrasonic_node 脚本文件名
+- Ultrasonic_node 脚本py文件名
 - main 入口函数
 5. 编译一下
 ```
@@ -240,8 +276,6 @@ from std_msgs.msg import String  #与ros1不同，在创建pkg时不需要写std
 class SsrNode(Node):
     '''
     define a class of ssr nodes
-
-    Attributes:
     '''
     def __init__(self,name):
         super().__init__(name)
@@ -258,11 +292,7 @@ class SsrNode(Node):
 
 def main(args=None):
     '''
-    description:入口函数
-
-    Args:
-
-    Returns:
+    入口函数
     '''
     rclpy.init(args=args)   #初始化节点
     Ultrasonic_node = SsrNode("Ultrasonic_node")  #新建节点
@@ -320,13 +350,15 @@ def main(args=None):
 ### 自定义接口
 1. 创建接口包
 `ros2 pkg create robot_msgs --build-type ament_cmake --dependencies rosidl_default_generators geometry_msgs`
-2. 包内创建msg(话题接口)和srv(服务接口)文件夹，并创建接口文件(.msg和.srv)
+2. 包内创建msg(话题接口)和srv(服务接口)和action(动作接口)文件夹，并创建接口文件(.msg和.srv .action)
 ├── msg
 │   ├── RobotPose.msg
 │   └── RobotStatus.msg
 ├── package.xml
 ├── srv
 │ └──MoveRobot.srv
+├── action
+│ └──ControlRobot.action
 1. 添加接口代码
    
 RobotStatus.msg
@@ -351,6 +383,20 @@ float32 distance
 # 当前的位置
 float32 pose
 ```
+ControlRobot.action
+```
+# Goal: 要移动的距离
+float32 distance
+---
+# Result: 最终的位置
+float32 pose
+---
+# Feedback: 中间反馈的位置和状态
+float32 pose
+uint32 status
+uint32 STATUS_MOVEING = 3
+uint32 STATUS_STOP = 4
+```
 4. 修改CMakeLists.txt文件
 ```
 # 添加下面的内容
@@ -358,6 +404,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/RobotPose.msg"
   "msg/RobotStatus.msg"
   "srv/MoveRobot.srv"
+  "action/ControlRobot.action"
   DEPENDENCIES geometry_msgs
 )
 ```
@@ -441,3 +488,152 @@ def move_robot_callback__(self,response):
     result = response.result()
     self.get_logger().info(f"now located {result.pose} meters away")
 ```
+[返回目录](#1)
+
+### param参数
+1. 定义参数
+`Node.declare_parameter(Ultrasonic_node,"period",5)`
+- Ultrasonic_node 定义的节点对象
+- "period" 参数名称
+- 5 参数值
+类内写法，不需要写对象了
+`self.declare_parameter("period",5)`
+2. 获取参数
+`period = Node.get_parameter(Ultrasonic_node,"period").value`
+- Ultrasonic_node 定义的节点对象
+- "period" 参数名称
+- .value 返回值的属性,可以单独写个点.看看补全的其他方法和属性
+还能这样写
+`period = Node.get_parameter(Ultrasonic_node,"period").get_parameter_value().integer_value`
+- .get_parameter_value() 获取参数数值的方法
+- .inter_value 获取整数数值
+类内写法
+`period = self.get_parameter("period").value`
+
+[返回目录](#1)
+
+### action服务端
+有点复杂，用到的时候再写
+
+## 3. launch文件编写
+1. 随便选择一个包，创建一个launch文件夹，文件夹内创建一个.launch.py文件
+```
+├── atr_pkg
+│   ├── launch  #放launch文件
+|       └── Motor.launch.py
+│   └── atr_pkg #放的节点.py文件夹,别弄错了
+|   ...
+```
+2. 编写代码
+```
+# 导入库
+from launch import LaunchDescription
+from launch_ros.actions import Node
+# from launch.actions import ExecuteProcess # ExecuteProcess用于在launch文件中启动一个进程
+
+def generate_launch_description():
+    # 函数名固定，由ros2 launch 扫描调用
+
+    #创建两个节点的启动对象，其他启动项写法不同
+    motor_node = Node(
+        package="atr_pkg",
+        executable="Motor_node"
+    )
+
+    Ultrasonic_node = Node(
+        package="ssr_pkg",
+        executable="Ultrasonic" #这里的节点名为你在节点.py中的节点对象
+                                #也就是setup.py中entry_points里添加的最前面的呢个名字
+    )
+
+    # teleop_key = ExecuteProcess(
+    #         cmd=['xterm', '-e', 'ros2', 'run', 'turtlesim', 'turtle_teleop_key'],
+    #         name='teleop_key',
+    #     )
+    #     ExecuteProcess()中最重要的参数是cmd，它是一个包含要执行的命令及其参数的列表。例如，cmd=['ls', '-l']将执行ls -l命令。
+    #     在上面的launch示例文件中，需要在你的系统中安装xterm才能使用这个功能。
+    #     sudo apt-get update
+    #     sudo apt-get install xterm
+    #     为什么没有将turtle_teleop_key以Node的方式进行启动？大概问题是，launch启动文件无法从终端获取用户输入，
+    #     所以使用ExecuteProcess替代，这将会自动运行一个xterm终端模拟器来获取键盘输入。
+    #     取自https://blog.csdn.net/xijuezhu8128/article/details/131818608
+
+    # 创建LaunchDescription对象launch_description,用于描述launch文件
+    launch_description = LaunchDescription(
+        [motor_node, Ultrasonic_node])
+    
+    return launch_description
+```
+launch启动Rviz2
+```
+from ament_index_python.packages import get_package_share_directory #启动rviz用
+import os   #启动rviz用
+
+def generate_launch_description():
+    rviz_name = 'display.rviz'  #rviz的配置文件
+    # 获取功能包路径（注意，这个路径是在工作空间的install文件夹里
+    package_name = 'atr_pkg'
+    pkg_description = get_package_share_directory(package_name)
+    # 声明文件路径，os.path.join将口号内的str用\连接，组成路径
+    rviz_config_path = os.path.join(pkg_description,'rviz',rviz_name)
+
+    # 创建Rviz项
+    rviz_node = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        output="screen",
+        arguments=['-d', rviz_config_path]
+    )
+
+    return  launch_description = LaunchDescription(
+        [rviz])
+
+# setup.py中添加这个(先看步骤3)
+# (os.path.join('share', package_name, 'rviz'), glob('rviz/*.rviz')),    #启动Rviz添加这一行
+```
+launch启动Gazebo
+```
+from ament_index_python.packages import get_package_share_directory #启动rviz和Gazebo用
+import os   #启动rviz和Gazebo用
+
+def generate_launch_description():
+
+    # 获取world路径
+    world_file_name = 'empty_world.world'
+    package_name = 'atr_pkg'
+    pkg_description = get_package_share_directory(package_name)
+    world = os.path.join(pkg_description,'world',world_file_name)
+
+    # 创建Gazebo项
+    gazebo = ExecuteProcess(
+        cmd=['gazebo', '--verbose',world],  #若没有world则删掉'--verbose',world
+        output='screen'
+        )
+
+    return  launch_description = LaunchDescription(
+            [gazebo])
+
+# 使用保存的world时，在setup.py中添加这个(先看步骤3)
+# (os.path.join('share', package_name, 'world'), glob('world/*.world')),    #使用保存的地图添加这一行
+```
+3. setup.py文件中添加额外代码
+```
+from glob import glob   #添加这一行
+import os               #添加这一行
+
+    data_files=[
+        ('share/ament_index/resource_index/packages',
+            ['resource/' + package_name]),
+        ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),  #添加这一行
+    ],
+```
+4. 编译并启动
+```
+colcon build --packages-select atr_pkg
+source install/setup.bash
+ros2 launch atr_pkg Motor.launch.py
+```
+
+[返回目录](#1)
