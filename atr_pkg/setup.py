@@ -1,4 +1,6 @@
 from setuptools import setup
+from glob import glob
+import os
 
 package_name = 'atr_pkg'
 
@@ -10,6 +12,9 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'), glob('launch/*.launch.py')),    #添加这一行
+        (os.path.join('share', package_name, 'rviz'), glob('rviz/*.rviz')),    #启动Rviz添加这一行
+        (os.path.join('share', package_name, 'world'), glob('world/*.world')),    #启动Gazebo自带地图添加这一行
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -23,4 +28,5 @@ setup(
             "Motor_node = atr_pkg.Motor_node:main"
         ],
     },
+    
 )

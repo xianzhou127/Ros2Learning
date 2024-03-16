@@ -69,6 +69,8 @@ class SsrNode(Node):
     #两个下划线表示private
     def __pub_callback(self):
         self.pub_pos.publish(self.msg)
+        pub_period = self.get_parameter("period").value
+        self.timer.timer_period_ns = pub_period*(1000*1000*1000)    #修改定时器周期
 
 def main(args=None):
     '''
@@ -79,11 +81,14 @@ def main(args=None):
     Returns:
     '''
     rclpy.init(args=args)   #初始化节点
-    Ultrasonic_node = SsrNode("Ultrasonic_node")  #新建节点
+    Ultrasonic_node = SsrNode("Ultrasonic")  #新建节点
 
     msg = String()
     msg.data = "I am Ultrasonic"
-    Ultrasonic_node.publish(1,msg)
+    # 参数设置
+    Node.declare_parameter(Ultrasonic_node,"period",5)
+    period = Node.get_parameter(Ultrasonic_node,"period").value
+    Ultrasonic_node.publish(period,msg)
 
     Pose = RobotPose()
     Pose.pose.position.x = 10.0    #前进10m
